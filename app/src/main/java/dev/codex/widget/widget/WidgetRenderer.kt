@@ -89,16 +89,18 @@ object WidgetRenderer {
             WidgetMode.MINI -> 120f to 64f
             WidgetMode.SLIM -> 120f to 78f
             WidgetMode.SQUARE -> 120f to 114f
-            WidgetMode.EXTENDED -> 196f to (h * 196f / w).coerceIn(208f, 400f)
+            WidgetMode.EXTENDED -> 180f to 180f
         }
-        val scale = minOf(w / baseW, h / baseH)
+        val breathingRoom = when(mode) { WidgetMode.MINI -> 0.94f; WidgetMode.EXTENDED -> 0.96f; else -> 1f }
+        val scale = minOf(w / baseW, h / baseH) * breathingRoom
         canvas.translate((w - baseW * scale) / 2f, (h - baseH * scale) / 2f)
         canvas.scale(scale, scale)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         paint.shader = LinearGradient(0f, 0f, 0f, baseH, 0xFF323235.toInt(), 0xFF202023.toInt(), Shader.TileMode.CLAMP)
-        canvas.drawRoundRect(0.5f, 0.5f, baseW - 0.5f, baseH - 0.5f, 17f, 17f, paint)
+        val cornerRadius = if (mode == WidgetMode.MINI) baseH / 2f else 17f
+        canvas.drawRoundRect(0.5f, 0.5f, baseW - 0.5f, baseH - 0.5f, cornerRadius, cornerRadius, paint)
         paint.shader = null; paint.style = Paint.Style.STROKE; paint.strokeWidth = 0.6f; paint.color = 0xFF4B4B52.toInt()
-        canvas.drawRoundRect(0.5f, 0.5f, baseW - 0.5f, baseH - 0.5f, 17f, 17f, paint)
+        canvas.drawRoundRect(0.5f, 0.5f, baseW - 0.5f, baseH - 0.5f, cornerRadius, cornerRadius, paint)
         paint.style = Paint.Style.FILL
         val c = Language.context(context)
         val es = Language.code(context) == "es"
@@ -167,7 +169,7 @@ object WidgetRenderer {
         } else {
             val extended = mode == WidgetMode.EXTENDED
             val pad = if (extended) 12f else 9f
-            val titleY = if (extended) 22f else 20f
+            val titleY = if (extended) 19f else 20f
             ContextCompat.getDrawable(c, R.drawable.ic_codex)?.apply {
                 setBounds(pad.toInt(), (titleY - 10).toInt(), (pad + 11).toInt(), (titleY + 1).toInt()); draw(canvas)
             }
@@ -175,17 +177,17 @@ object WidgetRenderer {
             val square = mode != WidgetMode.SLIM
             fun section(label: String, window: UsageWindow?, y: Float) {
                 text(label, pad, y, if (extended) 11f else 9f, MUTED, maxWidth = if (extended) 60f else 34f)
-                text(UsageFormat.percent(window, now, es), baseW - pad, y, if (extended) 17f else 13f, bold = true,
+                text(UsageFormat.percent(window, now, es), baseW - pad, y, if (extended) 16f else 13f, bold = true,
                     maxWidth = baseW - pad * 2 - if (extended) 65f else 37f, align = Paint.Align.RIGHT)
                 bar(window, y + 5)
-                if (square) text(UsageFormat.countdown(window?.resetsAt, now, es), pad, y + 18, if (extended) 9f else 7.7f, MUTED)
+                if (square) text(UsageFormat.countdown(window?.resetsAt, now, es), pad, y + if (extended) 16f else 18f, if (extended) 8.5f else 7.7f, MUTED)
             }
-            section(c.getString(R.string.five_hours), snapshot?.fiveHours, if (extended) 48f else 39f)
-            section(c.getString(R.string.weekly), snapshot?.weekly, if (extended) 91f else if (square) 86f else 64f)
+            section(c.getString(R.string.five_hours), snapshot?.fiveHours, if (extended) 40f else 39f)
+            section(c.getString(R.string.weekly), snapshot?.weekly, if (extended) 75f else if (square) 86f else 64f)
             if (extended) {
-                paint.color = TRACK; canvas.drawRect(12f, 124f, baseW - 12f, 124.6f, paint)
-                val lines = creditLines(context, snapshot, now, ((baseH - 151f) / 14f).toInt() - 1)
-                lines.forEachIndexed { index, value -> text(value, 12f, 141f + index * 14f, if (index == 0) 10f else 9f, if (index <= 1) WHITE else MUTED, bold = index == 0) }
+                paint.color = TRACK; canvas.drawRect(12f, 101f, baseW - 12f, 101.6f, paint)
+                val lines = creditLines(context, snapshot, now, 3)
+                lines.forEachIndexed { index, value -> text(value, 12f, 116f + index * 13f, if (index == 0) 10f else 9f, if (index <= 1) WHITE else MUTED, bold = index == 0) }
             }
         }
         return bitmap

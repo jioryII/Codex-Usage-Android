@@ -24,7 +24,7 @@ There are no exact alarms, permanent foreground services, analytics or redemptio
 
 ## Rendering and releases
 
-Square, Slim, Arc and Detail share a background and quota colors. Arc uses clock/calendar icons and bare numeric values; TalkBack retains descriptive percentage semantics. Resizing does not convert cards into an icon-sized Arc. Provider IDs stay compatible with existing installations.
+Square, Slim, Arc and Detail share a background and quota colors. Detail keeps square proportions even in a tall host cell; Arc uses capsule corners with a radius of half its height. Arc uses clock/calendar icons and bare numeric values; TalkBack retains descriptive percentage semantics. Resizing does not convert cards into an icon-sized Arc. Provider IDs stay compatible with existing installations.
 
 Production responsive bitmaps are bounded to 512 pixels per edge. Offline documentation exports use a separate 4× scale; README images are not enlarged low-resolution screenshots. Picker previews contain unknown values, not synthetic quotas.
 

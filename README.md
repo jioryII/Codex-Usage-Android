@@ -6,7 +6,7 @@ Native Android widgets for your Codex plan limits.
 
 [![Download APK](docs/assets/download.svg)](https://github.com/jioryII/Codex-Usage-Android/raw/refs/heads/main/downloads/codex-usage.apk)
 
-**v1.3.0 · Android 8+ · No API key · No analytics**
+**v1.3.1 · Android 8+ · No API key · No analytics**
 
 </div>
 
@@ -28,8 +28,8 @@ English is the initial language. Spanish remains available through **EN/ES**.
 | --- | --- |
 | **Square** | Usage bars, remaining percentages and reset countdowns. |
 | **Slim** | Two usage bars and percentages, without countdowns. |
-| **Arc** | Clock for 5 hours; calendar for weekly. Numeric values without `%`. |
-| **Detail** | Usage plus saved resets and available expiry dates. |
+| **Arc** | Compact pill with clock/calendar indicators and numeric values without `%`. |
+| **Detail** | Compact square card with usage, saved resets and available expiry dates. |
 
 All layouts share one dark finish. Remaining quota uses blue-to-purple at 75–100%, blue at 50–74%, orange at 25–49% and red below 25%. Icon-sized variants are removed; the launcher controls the final grid dimensions.
 

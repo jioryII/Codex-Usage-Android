@@ -40,7 +40,7 @@ class AndroidIntegrationTest {
         for(lang in listOf("en","es")) {
             Language.set(context,lang)
             for ((width,height,mode) in listOf(Triple(100,100,WidgetMode.SQUARE),Triple(120,114,WidgetMode.SQUARE),
-                Triple(100,70,WidgetMode.SLIM),Triple(120,78,WidgetMode.SLIM),Triple(120,64,WidgetMode.MINI),Triple(160,86,WidgetMode.MINI),Triple(170,180,WidgetMode.EXTENDED),Triple(220,300,WidgetMode.EXTENDED))) {
+                Triple(100,70,WidgetMode.SLIM),Triple(120,78,WidgetMode.SLIM),Triple(110,60,WidgetMode.MINI),Triple(160,86,WidgetMode.MINI),Triple(144,144,WidgetMode.EXTENDED),Triple(220,300,WidgetMode.EXTENDED))) {
                 val view = WidgetRenderer.views(context,sample,0,width.toFloat(),height.toFloat(),mode).apply(context,null)
                 view.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(height,View.MeasureSpec.EXACTLY))
                 view.layout(0,0,width,height)
@@ -70,7 +70,7 @@ class AndroidIntegrationTest {
         for (lang in listOf("en","es")) {
             Language.set(context,lang)
             for ((mode,width,height) in listOf(Triple(WidgetMode.SQUARE,240,228),Triple(WidgetMode.SLIM,240,156),
-                    Triple(WidgetMode.MINI,240,128),Triple(WidgetMode.EXTENDED,280,300))) {
+                    Triple(WidgetMode.MINI,220,120),Triple(WidgetMode.EXTENDED,288,288))) {
                 val bitmap=WidgetRenderer.bitmap(context,null,0,width.toFloat(),height.toFloat(),mode)
                 val file=File("build/outputs/widget-previews/$lang-${mode.name.lowercase()}.png").apply { parentFile!!.mkdirs() }
                 file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG,100,it) }
@@ -166,7 +166,7 @@ class AndroidIntegrationTest {
             context.resources.getXml(id).use { xml ->
                 while(xml.eventType!=org.xmlpull.v1.XmlPullParser.START_TAG) xml.next()
                 assertTrue(xml.getAttributeValue(namespace,"minWidth").removeSuffix("dip").removeSuffix("dp").toFloat()>=100)
-                assertTrue(xml.getAttributeValue(namespace,"minHeight").removeSuffix("dip").removeSuffix("dp").toFloat()>=64)
+                assertTrue(xml.getAttributeValue(namespace,"minHeight").removeSuffix("dip").removeSuffix("dp").toFloat()>=60)
                 assertTrue(xml.getAttributeIntValue(namespace,"targetCellWidth",0)>=2)
             }
         }

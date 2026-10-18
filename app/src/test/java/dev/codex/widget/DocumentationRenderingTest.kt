@@ -37,7 +37,7 @@ class DocumentationRenderingTest {
         paint.textSize=30f;paint.color=0xFFA2A2AA.toInt();paint.typeface=Typeface.create("sans-serif",Typeface.NORMAL)
         canvas.drawText("Four native Android widgets",70f,145f,paint)
         for ((mode,width,height) in listOf(Triple(WidgetMode.SQUARE,160,152),Triple(WidgetMode.SLIM,180,117),
-                Triple(WidgetMode.MINI,200,107),Triple(WidgetMode.EXTENDED,196,208))) {
+                Triple(WidgetMode.MINI,188,100),Triple(WidgetMode.EXTENDED,180,180))) {
             val snapshot=sample
             val bitmap=WidgetRenderer.bitmap(context,snapshot,now,width.toFloat(),height.toFloat(),mode,exportScale=4f)
             assertEquals(width*4,bitmap.width);assertEquals(height*4,bitmap.height)

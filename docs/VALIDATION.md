@@ -1,4 +1,4 @@
-# Validation — 1.3.0
+# Validation — 1.3.1
 
 ## Executed
 
@@ -8,6 +8,7 @@
 - Fresh installs select English even on a Spanish device. An explicit Spanish preference is retained.
 - Provider minimums no longer advertise icon-sized widgets. Resizing does not turn Square/Slim/Detail into Arc.
 - Square, Slim, Arc and Detail inflate and render in both languages. Unknown/expired quotas remain unknown. Color boundaries include orange for 25–49% remaining.
+- Detail stays square inside tall host cells; Arc is slightly smaller with 50%-height capsule corners.
 - Native 4× documentation exports; production bitmaps remain limited to 512 pixels per edge. Picker previews use placeholders.
 - Valid APK signature, matching the previous downloadable version for in-place updates.
 - Lint: zero errors, 35 warnings; details remain in the generated report.
