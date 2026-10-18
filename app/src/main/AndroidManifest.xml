@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" tools:node="remove" />
+    <application android:name=".CodexApplication" android:allowBackup="false"
+        android:fullBackupContent="false" android:dataExtractionRules="@xml/data_extraction_rules"
+        android:usesCleartextTraffic="false" android:label="@string/app_name" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher" android:localeConfig="@xml/locales_config"
+        android:theme="@style/AppTheme" android:supportsRtl="true">
+        <service android:name="androidx.work.impl.foreground.SystemForegroundService" tools:node="remove" />
+        <provider android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup" android:exported="false" tools:node="merge">
+            <meta-data android:name="androidx.work.WorkManagerInitializer" tools:node="remove" />
+        </provider>
+        <activity android:name=".SetupActivity" android:exported="true" android:launchMode="singleTop">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <receiver android:name=".widget.CodexWidgetProvider" android:label="@string/widget_square" android:exported="false">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/codex_widget_info" />
+        </receiver>
+        <receiver android:name=".widget.SlimWidgetProvider" android:label="@string/widget_slim" android:exported="false">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/codex_widget_slim_info" />
+        </receiver>
+        <receiver android:name=".widget.MiniWidgetProvider" android:label="@string/widget_mini" android:exported="false">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/codex_widget_mini_info" />
+        </receiver>
+        <receiver android:name=".widget.ExtendedWidgetProvider" android:label="@string/widget_extended" android:exported="false">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/codex_widget_extended_info" />
+        </receiver>
+        <receiver android:name=".sync.SystemReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>
