@@ -28,6 +28,14 @@ class ClaudeTest {
         assertEquals(snapshot, SnapshotCodec.decode(SnapshotCodec.encode(snapshot)))
     }
 
+    @Test fun `reset timestamps accept Z and numeric offsets without relying on JDK 12 Instant parsing`() {
+        val expected = Instant.parse("2026-11-13T12:00:00Z").epochSecond
+        for (value in listOf("2026-11-13T12:00:00Z", "2026-11-13T12:00:00.123456+00:00", "2026-11-13T14:00:00+02:00", "2026-11-13T07:00:00.5-05:00")) {
+            val body = """{"five_hour":{"utilization":10,"resets_at":"$value"}}"""
+            assertEquals(value, expected, UsageParser.claude(body, now).fiveHours!!.resetsAt)
+        }
+    }
+
     @Test fun `missing and expired windows never invent quota and invalid contracts fail`() {
         val snapshot = UsageParser.claude("""{"five_hour":null,"seven_day":{"utilization":null}}""", now)
         assertNull(snapshot.fiveHours); assertNull(snapshot.weekly)

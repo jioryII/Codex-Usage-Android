@@ -1,7 +1,8 @@
 package dev.codex.widget.domain
 
 import org.json.JSONObject
-import java.time.Instant
+import java.time.OffsetDateTime
+import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
 
 data class UsageWindow(val remaining: Int, val resetsAt: Long?)
@@ -53,7 +54,7 @@ object UsageParser {
             val row = root.getJSONObject(key)
             if (!row.has("utilization") || row.isNull("utilization")) return null
             val reset = if (!row.has("resets_at") || row.isNull("resets_at")) null
-                else Instant.parse(row.getString("resets_at")).epochSecond
+                else isoEpochSecond(row.getString("resets_at"))
             return UsageWindow(UsageFormat.remaining(row.getDouble("utilization")), reset)
         }
         return UsageSnapshot(window("five_hour"), window("seven_day"), null, null, now,
@@ -82,7 +83,7 @@ object UsageParser {
             if (row.optString("reset_type") != "codex_rate_limits") null
             else ResetCredit(row.getString("id").also { require(it.isNotBlank()) }, row.getString("status"),
                 row.optString("expires_at").takeIf { it.isNotBlank() && it != "null" }
-                    ?.let { runCatching { Instant.parse(it).epochSecond }.getOrNull() })
+                    ?.let { runCatching { isoEpochSecond(it) }.getOrNull() })
         }.distinctBy { it.id }
         require(credits.count { it.status == "available" } <= count) { "Inconsistent reset credit summary" }
         return count to credits
@@ -110,6 +111,13 @@ object UsageParser {
             credits, now, "Codex app-server")
     }
 }
+
+/**
+ * ISO-8601 instant with either `Z` or a numeric offset (Claude sends `+00:00`).
+ * `Instant.parse` only accepts offsets on JDK 12+, so it fails on Android 8-13 (API 26-33).
+ */
+internal fun isoEpochSecond(value: String): Long =
+    OffsetDateTime.parse(value, DateTimeFormatter.ISO_OFFSET_DATE_TIME).toEpochSecond()
 
 internal fun JSONObject.longOrNull(key: String): Long? =
     if (!has(key) || isNull(key)) null else getLong(key).takeIf { it > 0 }

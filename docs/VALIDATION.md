@@ -1,3 +1,10 @@
+# Review follow-up — 1.4.0
+
+- **Fixed:** Claude `resets_at` values such as `2026-11-13T12:00:00.000000+00:00` were parsed with `Instant.parse`, which accepts numeric offsets only on JDK 12+. On Android 8–13 (API 26–33) every Claude read would fail as `incompatible`. Timestamps are now parsed with `OffsetDateTime` + `ISO_OFFSET_DATE_TIME` (Codex reset-credit expiries use the same helper). JVM tests cannot reproduce the old-Android failure because they run on JDK 21.
+- **Fixed test:** the Claude UI flow waited forever because Robolectric never satisfies WorkManager's `CONNECTED` constraint. The test now uses the WorkManager test driver to release the login work; the app logic was unchanged.
+- `./gradlew testDebugUnitTest lintDebug assembleDebug` — **BUILD SUCCESSFUL**, **74 JVM/Robolectric tests passed, 0 failures**, including the Robolectric Claude UI flow and orange widget rendering.
+- The published `downloads/codex-usage-claude.apk` predates this fix and was not rebuilt (signing key not available here).
+
 # Validation — 1.4.0 / Claude compatibility
 
 ## Executed for this change

@@ -9,7 +9,11 @@ import android.view.ViewGroup
 import android.widget.TextView
 import android.widget.EditText
 import androidx.test.core.app.ApplicationProvider
+import androidx.work.Configuration
 import androidx.work.WorkManager
+import androidx.work.testing.SynchronousExecutor
+import androidx.work.testing.WorkManagerTestInitHelper
+import dev.codex.widget.sync.LoginWork
 import dev.codex.widget.data.*
 import dev.codex.widget.domain.UsageSnapshot
 import dev.codex.widget.domain.UsageWindow
@@ -88,6 +92,16 @@ class ConnectionUiTest {
         val file = File("build/outputs/connection-fixtures/$name.png").apply { parentFile!!.mkdirs() }
         file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
+    private fun releaseLoginWork() {
+        val until = System.currentTimeMillis() + 8000
+        while (System.currentTimeMillis() < until) {
+            shadowOf(Looper.getMainLooper()).idle()
+            val work = WorkManager.getInstance(app).getWorkInfosForUniqueWork(LoginWork.NAME).get().firstOrNull()
+            if (work != null) { WorkManagerTestInitHelper.getTestDriver(app)!!.setAllConstraintsMet(work.id); return }
+            Thread.sleep(10)
+        }
+        fail("Claude login work was never enqueued")
+    }
     @Before fun language() { Language.set(app,"es") }
     @After fun finish() {
         WorkManager.getInstance(app).cancelAllWork().result.get(5, TimeUnit.SECONDS)
@@ -154,6 +168,8 @@ class ConnectionUiTest {
     }
 
     @Test fun `Claude browser return preserves authorization and manual code completes the connection`() {
+        // Robolectric never reports a validated network, so the CONNECTED constraint is released by the test driver.
+        WorkManagerTestInitHelper.initializeTestWorkManager(app, Configuration.Builder().setExecutor(SynchronousExecutor()).build())
         runBlocking { app.graph.login.begin(UsageProvider.CLAUDE) }
         val pending = app.graph.store.read().getJSONObject(LoginManager.PENDING)
         val url = ClaudeAuth.authorizationUrl(pending)
@@ -170,6 +186,7 @@ class ConnectionUiTest {
             assertFalse(input.isSaveEnabled)
             input.setText("returned-code#${pending.getString("id")}")
             views.filterIsInstance<TextView>().first { it.text.toString() == "Completar conexión" }.performClick()
+            releaseLoginWork()
             await(controller.get(), "SESIÓN INICIADA")
             val visible = texts(controller.get().window.decorView)
             assertTrue(visible.contains("Claude")); assertTrue(visible.contains("Añadir widget"))
