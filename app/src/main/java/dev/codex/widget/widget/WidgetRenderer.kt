@@ -38,7 +38,7 @@ object WidgetRenderer {
         val es = Language.code(context) == "es"
         val sections = listOf(c.getString(R.string.five_hours) to snapshot?.fiveHours, c.getString(R.string.weekly) to snapshot?.weekly)
         return buildList {
-            if (mode != WidgetMode.MINI) add("Codex")
+            if (mode != WidgetMode.MINI || snapshot?.provider == UsageProvider.CLAUDE) add(snapshot?.provider?.label ?: "Codex")
             sections.forEach { (label, window) ->
                 add("$label: ${UsageFormat.percent(window, now, es)}")
                 if (mode == WidgetMode.SQUARE || mode == WidgetMode.EXTENDED) add(UsageFormat.countdown(window?.resetsAt, now, es))
@@ -49,6 +49,12 @@ object WidgetRenderer {
 
     fun creditLines(context: Context, snapshot: UsageSnapshot?, now: Long, maxRows: Int): List<String> {
         val c = Language.context(context)
+        if (snapshot?.provider == UsageProvider.CLAUDE) {
+            val updated = Instant.ofEpochSecond(snapshot.fetchedAt).atZone(java.time.ZoneId.systemDefault())
+                .format(DateTimeFormatter.ofPattern("d MMM · HH:mm", Language.locale(context)))
+            return listOf(c.getString(R.string.claude_plan_limits), c.getString(R.string.claude_all_models),
+                if (snapshot.fetchedAt > 0) c.getString(R.string.last_update, updated) else c.getString(R.string.usage_none))
+        }
         val credits = WidgetPolicy.credits(snapshot, now)
         // A server summary is shown as read. Never infer dates or manufacture units.
         val staleCount = snapshot?.availableCount?.let { it > 0 && snapshot.credits.orEmpty().any { row -> row.status == "available" && row.expiresAt?.let { expiry -> expiry <= now } == true } } == true
@@ -113,14 +119,14 @@ object WidgetRenderer {
         }
         fun quotaPaint(remaining: Int?, left: Float, right: Float) {
             paint.shader = null
-            paint.color = when (WidgetPolicy.tone(remaining)) {
+            paint.color = when (WidgetPolicy.tone(remaining, snapshot?.provider ?: UsageProvider.CODEX)) {
                 QuotaTone.FULL -> 0xFF956AF1.toInt()
                 QuotaTone.BLUE -> 0xFF65B4E5.toInt()
                 QuotaTone.ORANGE -> 0xFFFFA164.toInt()
                 QuotaTone.RED -> 0xFFF16C77.toInt()
                 QuotaTone.UNKNOWN -> MUTED
             }
-            if (WidgetPolicy.tone(remaining) == QuotaTone.FULL)
+            if (WidgetPolicy.tone(remaining, snapshot?.provider ?: UsageProvider.CODEX) == QuotaTone.FULL)
                 paint.shader = LinearGradient(left, 0f, right, 0f, 0xFF65B4E5.toInt(), 0xFFA276F4.toInt(), Shader.TileMode.CLAMP)
         }
         fun bar(window: UsageWindow?, y: Float) {
@@ -170,10 +176,11 @@ object WidgetRenderer {
             val extended = mode == WidgetMode.EXTENDED
             val pad = if (extended) 12f else 9f
             val titleY = if (extended) 19f else 20f
-            ContextCompat.getDrawable(c, R.drawable.ic_codex)?.apply {
+            val isClaude = snapshot?.provider == UsageProvider.CLAUDE
+            if (!isClaude) ContextCompat.getDrawable(c, R.drawable.ic_codex)?.apply {
                 setBounds(pad.toInt(), (titleY - 10).toInt(), (pad + 11).toInt(), (titleY + 1).toInt()); draw(canvas)
             }
-            text("Codex", pad + 15, titleY, 11f)
+            text(snapshot?.provider?.label ?: "Codex", if (isClaude) pad else pad + 15, titleY, 11f, if (isClaude) 0xFFFFA164.toInt() else WHITE)
             val square = mode != WidgetMode.SLIM
             fun section(label: String, window: UsageWindow?, y: Float) {
                 text(label, pad, y, if (extended) 11f else 9f, MUTED, maxWidth = if (extended) 60f else 34f)

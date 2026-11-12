@@ -3,6 +3,7 @@ package dev.codex.widget.data
 import dev.codex.widget.domain.UsageParser
 import dev.codex.widget.domain.UsageSnapshot
 import dev.codex.widget.domain.SyncPolicy
+import dev.codex.widget.domain.UsageProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
@@ -93,7 +94,7 @@ class UsageRepository(
                 source(session).read(time)
             }
             state.put("snapshot", SnapshotCodec.encode(snapshot)).put("lastSuccess", time)
-                .put("diagnostic", if (snapshot.credits == null) "usage_partial" else "usage_ok")
+                .put("diagnostic", if (snapshot.provider == UsageProvider.CODEX && snapshot.credits == null) "usage_partial" else "usage_ok")
                 .put("retryAt", 0).put("failures", 0).put("lastFailed", false)
             save(state)
             afterFresh(snapshot, state)

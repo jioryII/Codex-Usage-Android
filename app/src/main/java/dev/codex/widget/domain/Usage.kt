@@ -6,6 +6,7 @@ import kotlin.math.roundToInt
 
 data class UsageWindow(val remaining: Int, val resetsAt: Long?)
 data class ResetCredit(val id: String, val status: String, val expiresAt: Long?)
+enum class UsageProvider(val label: String) { CODEX("Codex"), CLAUDE("Claude") }
 data class UsageSnapshot(
     val fiveHours: UsageWindow?,
     val weekly: UsageWindow?,
@@ -14,6 +15,7 @@ data class UsageSnapshot(
     val credits: List<ResetCredit>?,
     val fetchedAt: Long,
     val source: String,
+    val provider: UsageProvider = UsageProvider.CODEX,
 )
 
 object UsageFormat {
@@ -43,6 +45,21 @@ object UsageFormat {
 }
 
 object UsageParser {
+    fun claude(body: String, now: Long): UsageSnapshot {
+        val root = JSONObject(body)
+        require(root.has("five_hour") || root.has("seven_day")) { "Claude usage contract unavailable" }
+        fun window(key: String): UsageWindow? {
+            if (!root.has(key) || root.isNull(key)) return null
+            val row = root.getJSONObject(key)
+            if (!row.has("utilization") || row.isNull("utilization")) return null
+            val reset = if (!row.has("resets_at") || row.isNull("resets_at")) null
+                else Instant.parse(row.getString("resets_at")).epochSecond
+            return UsageWindow(UsageFormat.remaining(row.getDouble("utilization")), reset)
+        }
+        return UsageSnapshot(window("five_hour"), window("seven_day"), null, null, now,
+            "Claude OAuth (unofficial)", UsageProvider.CLAUDE)
+    }
+
     fun internalUsage(body: String, now: Long): UsageSnapshot {
         val root = JSONObject(body)
         require(root.has("rate_limit")) { "Usage contract unavailable" }

@@ -10,6 +10,8 @@ import android.os.Bundle
 import android.util.SizeF
 import android.widget.RemoteViews
 import dev.codex.widget.data.SnapshotCodec
+import dev.codex.widget.data.Session
+import dev.codex.widget.domain.UsageSnapshot
 import dev.codex.widget.domain.WidgetMode
 import dev.codex.widget.graph
 import dev.codex.widget.sync.Scheduler
@@ -34,7 +36,12 @@ open class CodexWidgetProvider : AppWidgetProvider() {
         @Suppress("DEPRECATION")
         fun renderAll(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
-            val snapshot = runCatching { SnapshotCodec.decode(context.graph.store.read().optJSONObject("snapshot")) }.getOrNull()
+            val snapshot = runCatching {
+                val state = context.graph.store.read()
+                SnapshotCodec.decode(state.optJSONObject("snapshot")) ?: state.optJSONObject("session")?.let {
+                    UsageSnapshot(null, null, null, null, 0, "", Session.decode(it).provider)
+                }
+            }.getOrNull()
             val now = System.currentTimeMillis() / 1000
             variants.forEach { (provider, mode) ->
                 manager.getAppWidgetIds(ComponentName(context, provider)).forEach { id ->

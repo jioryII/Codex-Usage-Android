@@ -23,6 +23,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import dev.codex.widget.data.DeviceAuth
 import dev.codex.widget.data.LoginPhase
 import dev.codex.widget.data.LoginView
+import dev.codex.widget.domain.UsageProvider
 import dev.codex.widget.sync.Scheduler
 import dev.codex.widget.widget.CodexWidgetProvider
 import kotlinx.coroutines.*
@@ -34,6 +35,12 @@ import java.time.format.DateTimeFormatter
 
 /** Connection, presentation preferences and permission controls. No parallel usage dashboard. */
 class SetupActivity : ComponentActivity() {
+    private lateinit var brand: TextView
+    private lateinit var brandIcon: ImageView
+    private lateinit var claudePending: LinearLayout
+    private lateinit var claudeCode: EditText
+    private lateinit var claudeExpiry: TextView
+    private lateinit var claudeSubmit: Button
     private lateinit var badge: TextView
     private lateinit var heading: TextView
     private lateinit var detail: TextView
@@ -90,8 +97,10 @@ class SetupActivity : ComponentActivity() {
         }
         setContentView(scroll)
         val header = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-        header.addView(ImageView(this).apply { setImageResource(R.drawable.ic_codex); importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }, LinearLayout.LayoutParams(dp(27), dp(27)))
-        header.addView(text("Codex", 25f, WHITE, true), LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(10) })
+        brandIcon = ImageView(this).apply { setImageResource(R.drawable.ic_codex); importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }
+        header.addView(brandIcon, LinearLayout.LayoutParams(dp(27), dp(27)))
+        brand = text("Codex + Claude", 22f, WHITE, true)
+        header.addView(brand, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(10) })
         header.addView(Button(this).apply {
             text = if (Language.code(this@SetupActivity) == "es") "ES ▾" else "EN ▾"
             contentDescription = getString(R.string.language); isAllCaps = false; textSize = 13f; setTextColor(WHITE)
@@ -106,6 +115,9 @@ class SetupActivity : ComponentActivity() {
         requesting = ProgressBar(this).also { connection.addView(it, LinearLayout.LayoutParams(dp(26), dp(26))) }
         disconnected = group(connection)
         button(disconnected, R.string.continue_chatgpt, primary = true) { beginLogin() }
+        button(disconnected, R.string.continue_claude) { beginLogin(UsageProvider.CLAUDE) }.apply {
+            setTextColor(ORANGE); background = shape("#3C2921", 14f)
+        }
         disconnected.addView(text(getString(R.string.providers), 12f, MUTED), params(top = 10))
         pending = group(connection)
         pending.addView(text(getString(R.string.your_code), 10f, MUTED, true), params(bottom = 6))
@@ -119,6 +131,18 @@ class SetupActivity : ComponentActivity() {
         pendingMessage = text(getString(R.string.checking), 12f, BLUE).also { pending.addView(it, params(top = 12)) }
         button(pending, R.string.check_auth) { graph.resumeLogin(); pendingMessage.setText(R.string.same_auth) }
         button(pending, R.string.cancel_auth) { graph.cancelLogin() }
+        claudePending = group(connection)
+        claudePending.addView(text(getString(R.string.claude_auth_steps), 13f, MUTED), params(bottom = 8))
+        button(claudePending, R.string.open_claude) { openClaudeAuthorization() }
+        claudeCode = EditText(this).apply {
+            hint = getString(R.string.claude_code_hint); setTextColor(WHITE); setHintTextColor(MUTED)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            isSingleLine = true; isSaveEnabled = false
+            importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO
+        }.also { claudePending.addView(it, params(top = 10)) }
+        claudeSubmit = button(claudePending, R.string.connect_claude) { submitClaudeCode() }
+        claudeExpiry = text("", 12f, MUTED).also { claudePending.addView(it, params(top = 8)) }
+        button(claudePending, R.string.cancel_auth) { claudeCode.text.clear(); graph.cancelLogin() }
         connected = group(connection)
         usageStatus = text("", 13f, MUTED).also { connected.addView(it, params(top = 10, bottom = 8)) }
         button(connected, R.string.add_widget, primary = true) { chooseWidget() }
@@ -139,23 +163,31 @@ class SetupActivity : ComponentActivity() {
         }.apply { visibility = View.GONE; setTextColor(Color.rgb(255, 139, 147)); background = shape("#321D24", 14f) }
         button(column, R.string.help) { diagnostics() }
         column.addView(text(getString(R.string.footer), 11f, MUTED), params(top = 14))
-        disconnected.visibility = View.GONE; pending.visibility = View.GONE; connected.visibility = View.GONE; reminderCard.visibility = View.GONE
+        disconnected.visibility = View.GONE; pending.visibility = View.GONE; claudePending.visibility = View.GONE; connected.visibility = View.GONE; reminderCard.visibility = View.GONE
         column.isFocusableInTouchMode = true; column.requestFocus()
     }
     private fun render(view: LoginView, state: JSONObject) {
         current = view; lastState = state; rendering = true
         val signedIn = view.phase == LoginPhase.SIGNED_IN
+        val isClaude = view.provider == UsageProvider.CLAUDE
+        brand.text = if (signedIn || view.phase == LoginPhase.WAITING || view.phase == LoginPhase.EXCHANGING) view.provider.label else "Codex + Claude"
+        brand.setTextColor(if (isClaude) ORANGE else WHITE)
+        brandIcon.visibility = if (isClaude) View.GONE else View.VISIBLE
         val waiting = view.phase == LoginPhase.WAITING || view.phase == LoginPhase.EXCHANGING
         disconnected.visibility = if (view.phase == LoginPhase.SIGNED_OUT || view.phase == LoginPhase.ERROR) View.VISIBLE else View.GONE
-        pending.visibility = if (waiting) View.VISIBLE else View.GONE
+        pending.visibility = if (waiting && !isClaude) View.VISIBLE else View.GONE
+        claudePending.visibility = if (waiting && isClaude) View.VISIBLE else View.GONE
+        claudeSubmit.isEnabled = waiting && view.phase != LoginPhase.EXCHANGING
+        claudeCode.isEnabled = claudeSubmit.isEnabled
+        if (!waiting) claudeCode.text.clear()
         connected.visibility = if (signedIn) View.VISIBLE else View.GONE
-        reminderCard.visibility = if (signedIn) View.VISIBLE else View.GONE
+        reminderCard.visibility = if (signedIn && !isClaude) View.VISIBLE else View.GONE
         requesting.visibility = if (view.phase == LoginPhase.REQUESTING) View.VISIBLE else View.GONE
         signOut.visibility = if (signedIn) View.VISIBLE else View.GONE
         heading.visibility = if (signedIn) View.GONE else View.VISIBLE
         detail.visibility = if (signedIn) View.GONE else View.VISIBLE
         signOut.setText(R.string.sign_out)
-        badge.setTextColor(if (signedIn) GREEN else BLUE)
+        badge.setTextColor(if (isClaude) ORANGE else if (signedIn) GREEN else BLUE)
         when (view.phase) {
             LoginPhase.SIGNED_IN -> {
                 badge.setText(R.string.signed_in)
@@ -168,9 +200,9 @@ class SetupActivity : ComponentActivity() {
             }
             LoginPhase.WAITING, LoginPhase.EXCHANGING -> {
                 badge.setText(R.string.auth_in_progress)
-                heading.setText(if (view.phase == LoginPhase.EXCHANGING) R.string.saving_session else R.string.continue_openai)
+                heading.setText(if (view.phase == LoginPhase.EXCHANGING) R.string.saving_session else if (isClaude) R.string.continue_claude else R.string.continue_openai)
                 detail.setText(R.string.browser_return)
-                if (code.text.toString() != view.code) code.text = view.code
+                if (!isClaude && code.text.toString() != view.code) code.text = view.code
                 authorizationButton.isEnabled = view.phase == LoginPhase.WAITING
                 authorizationButton.setText(if (view.phase == LoginPhase.EXCHANGING) R.string.authorized else R.string.copy_open)
                 pendingMessage.text = view.message?.let { Language.message(this, it) }
@@ -187,14 +219,40 @@ class SetupActivity : ComponentActivity() {
         val deadline = current.expiresAt ?: return
         val left = (deadline - System.currentTimeMillis() / 1000).coerceAtLeast(0)
         expiry.text = if (left > 0) getString(R.string.code_expires, "${left / 60}:${(left % 60).toString().padStart(2, '0')}") else getString(R.string.code_expired)
+        claudeExpiry.text = current.message?.let { Language.message(this, it) } ?: expiry.text
+        claudeSubmit.isEnabled = left > 0 && current.phase == LoginPhase.WAITING
     }
-    private fun beginLogin() {
+    private fun beginLogin(provider: UsageProvider = UsageProvider.CODEX) {
         if (consentShowing || current.phase == LoginPhase.SIGNED_IN || current.phase == LoginPhase.REQUESTING) return
         if (current.phase == LoginPhase.WAITING || current.phase == LoginPhase.EXCHANGING) { graph.resumeLogin(); return }
         consentShowing = true
-        AlertDialog.Builder(this).setTitle(R.string.consent_title).setMessage(R.string.consent)
-            .setNegativeButton(R.string.not_now, null).setPositiveButton(R.string.continue_action) { _, _ -> graph.beginLogin() }
+        AlertDialog.Builder(this).setTitle(if (provider == UsageProvider.CLAUDE) R.string.continue_claude else R.string.consent_title)
+            .setMessage(if (provider == UsageProvider.CLAUDE) R.string.claude_consent else R.string.consent)
+            .setNegativeButton(R.string.not_now, null).setPositiveButton(R.string.continue_action) { _, _ -> graph.beginLogin(provider) }
             .setOnDismissListener { consentShowing = false }.show()
+    }
+    private fun openClaudeAuthorization() {
+        val url = current.authorizationUrl ?: return
+        if ((current.expiresAt ?: 0) <= System.currentTimeMillis() / 1000) {
+            Toast.makeText(this, R.string.code_expired, Toast.LENGTH_LONG).show(); return
+        }
+        try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE)) }
+        catch (_: ActivityNotFoundException) { Toast.makeText(this, R.string.browser_unavailable, Toast.LENGTH_LONG).show() }
+    }
+    private fun submitClaudeCode() {
+        val value = claudeCode.text.toString()
+        claudeSubmit.isEnabled = false
+        lifecycleScope.launch {
+            try {
+                withContext(Dispatchers.IO) { graph.login.submitClaudeCode(value) }
+                claudeCode.text.clear()
+                graph.resumeLogin()
+            } catch (error: CancellationException) { throw error }
+            catch (_: Exception) {
+                claudeCode.error = getString(R.string.claude_invalid_code)
+                claudeSubmit.isEnabled = true
+            }
+        }
     }
     private fun openAuthorization() {
         val value = current.code ?: return
@@ -260,6 +318,7 @@ class SetupActivity : ComponentActivity() {
         private val WHITE = Color.rgb(239, 241, 245)
         private val MUTED = Color.rgb(162, 170, 182)
         private val BLUE = Color.rgb(155, 196, 245)
+        private val ORANGE = Color.rgb(255, 161, 100)
         private val GREEN = Color.rgb(132, 222, 170)
     }
 }

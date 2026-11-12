@@ -14,6 +14,9 @@ import dev.codex.widget.data.LoginManager
 import dev.codex.widget.data.LoginPhase
 import dev.codex.widget.data.StateStore
 import dev.codex.widget.data.HttpTransport
+import dev.codex.widget.data.ClaudeAuth
+import dev.codex.widget.data.ClaudeUsageSource
+import dev.codex.widget.domain.UsageProvider
 import dev.codex.widget.notify.CreditNotifications
 import dev.codex.widget.sync.Scheduler
 import dev.codex.widget.sync.LoginWork
@@ -27,24 +30,32 @@ class AppGraph(context: Context, val store: StateStore = SecureStateStore(contex
     @Volatile var appVisible = false
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val auth = DeviceAuth(http)
-    val repository = UsageRepository(store, auth, { InternalUsageSource(http, it) })
-    val login = LoginManager(repository, auth)
+    val repository = UsageRepository(store, auth, {
+        when (it.provider) {
+            UsageProvider.CODEX -> InternalUsageSource(http, it)
+            UsageProvider.CLAUDE -> ClaudeUsageSource(http, it)
+        }
+    })
+    val login = LoginManager(repository, auth, claude = ClaudeAuth(http))
     val notifications = CreditNotifications(context)
     fun recoverLogin() = scope.launch {
         runCatching {
             login.recover()
-            val phase = login.view().phase
-            if (phase == LoginPhase.WAITING || phase == LoginPhase.EXCHANGING) LoginWork.enqueue(appContext)
+            enqueueAuthorization()
         }
     }
-    fun beginLogin() = scope.launch {
-        runCatching { login.begin(); LoginWork.enqueue(appContext) }
+    fun beginLogin(provider: UsageProvider = UsageProvider.CODEX) = scope.launch {
+        runCatching { login.begin(provider); enqueueAuthorization() }
     }
     fun resumeLogin() = scope.launch {
         runCatching {
-            val phase = login.view().phase
-            if (phase == LoginPhase.WAITING || phase == LoginPhase.EXCHANGING) LoginWork.enqueue(appContext)
+            enqueueAuthorization()
         }
+    }
+    private suspend fun enqueueAuthorization() {
+        val view = login.view()
+        if (view.phase == LoginPhase.EXCHANGING || (view.phase == LoginPhase.WAITING && view.provider == UsageProvider.CODEX))
+            LoginWork.enqueue(appContext)
     }
     fun cancelLogin() = scope.launch {
         LoginWork.cancel(appContext)

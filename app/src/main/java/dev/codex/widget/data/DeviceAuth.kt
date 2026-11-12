@@ -3,6 +3,7 @@ package dev.codex.widget.data
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import org.json.JSONObject
+import dev.codex.widget.domain.UsageProvider
 import java.net.URLEncoder
 import java.util.Base64
 import kotlin.coroutines.coroutineContext
@@ -14,12 +15,14 @@ class AuthorizationGrant(val code: String, val verifier: String) {
         fun decode(root: JSONObject) = AuthorizationGrant(root.getString("code"), root.getString("verifier"))
     }
 }
-class Session(val access: String, val refresh: String, val accountId: String, val expires: Long, val email: String? = null) {
+class Session(val access: String, val refresh: String, val accountId: String, val expires: Long, val email: String? = null,
+    val provider: UsageProvider = UsageProvider.CODEX) {
     fun encode(): JSONObject = JSONObject().put("access", access).put("refresh", refresh)
-        .put("account", accountId).put("expires", expires).put("email", email ?: JSONObject.NULL)
+        .put("account", accountId).put("expires", expires).put("email", email ?: JSONObject.NULL).put("provider", provider.name)
     companion object {
         fun decode(json: JSONObject) = Session(json.getString("access"), json.getString("refresh"),
-            json.getString("account"), json.getLong("expires"), json.optString("email").takeUnless { it.isBlank() || it == "null" })
+            json.getString("account"), json.getLong("expires"), json.optString("email").takeUnless { it.isBlank() || it == "null" },
+            UsageProvider.valueOf(json.optString("provider", "CODEX")))
     }
 }
 
@@ -63,7 +66,8 @@ class DeviceAuth(private val http: HttpTransport) {
             "application/x-www-form-urlencoded", emptyMap())), null)
     }
 
-    suspend fun refresh(session: Session): Session = parse(JSONObject(http.json("$ISSUER/oauth/token",
+    suspend fun refresh(session: Session): Session = if (session.provider == UsageProvider.CLAUDE) ClaudeAuth(http).refresh(session)
+    else parse(JSONObject(http.json("$ISSUER/oauth/token",
         JSONObject().put("client_id", CLIENT_ID).put("grant_type", "refresh_token")
             .put("refresh_token", session.refresh))), session)
 

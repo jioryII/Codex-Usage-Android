@@ -4,8 +4,9 @@ package dev.codex.widget.domain
 enum class QuotaTone { FULL, BLUE, ORANGE, RED, UNKNOWN }
 enum class WidgetMode { SQUARE, SLIM, MINI, EXTENDED }
 object WidgetPolicy {
-    fun tone(remaining: Int?) = when {
+    fun tone(remaining: Int?, provider: UsageProvider = UsageProvider.CODEX) = when {
         remaining == null -> QuotaTone.UNKNOWN
+        provider == UsageProvider.CLAUDE -> QuotaTone.ORANGE
         remaining >= 75 -> QuotaTone.FULL
         remaining >= 50 -> QuotaTone.BLUE
         remaining >= 25 -> QuotaTone.ORANGE

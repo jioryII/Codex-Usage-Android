@@ -14,6 +14,16 @@ Tokens, pending authorization, cache and reminder deduplication are encrypted wi
 
 References: [account contract](https://github.com/openai/codex/blob/1cc7dc8f2acc63ce6c1cb72271e6b90a76136c2b/codex-rs/app-server-protocol/src/protocol/v2/account.rs), [backend client](https://github.com/openai/codex/blob/1cc7dc8f2acc63ce6c1cb72271e6b90a76136c2b/codex-rs/backend-client/src/client/rate_limit_resets.rs), [device authorization](https://github.com/openai/codex/blob/1cc7dc8f2acc63ce6c1cb72271e6b90a76136c2b/codex-rs/login/src/device_code_auth.rs).
 
+### Claude compatibility
+
+`ClaudeAuth` uses the public Claude Code client ID, browser authorization at `https://claude.ai/oauth/authorize`, S256 PKCE, independent random state, and the manual redirect `https://platform.claude.com/oauth/code/callback`. The user pastes the complete `code#state`; mismatched state and expired requests are rejected locally. Only `user:profile` is requested for usage. Codes and verifiers are stored in the existing encrypted state, and the input field is excluded from Activity saved state and autofill. WorkManager exchanges submitted codes and persists the session before requesting usage. Claude has no device-code polling loop. Token exchange and refresh use `https://platform.claude.com/v1/oauth/token`.
+
+`ClaudeUsageSource` reads `GET https://api.anthropic.com/api/oauth/usage` with the Claude bearer and `anthropic-beta: oauth-2025-04-20`. `five_hour` and `seven_day` map `utilization` to remaining percentage and parse ISO-8601 `resets_at`. Model-specific windows are not substituted for the overall weekly limit. Missing/null windows stay unknown; incompatible payloads fail without overwriting the cached snapshot. Existing cooldown and retry policies apply. Claude does not request Codex credit endpoints or send ChatGPT account headers.
+
+Sessions and cached snapshots persist a provider discriminator; legacy records without it default to Codex. Only one account is active at a time. All Claude quota fills are orange, including low quota, with neutral unknown data. Detail shows Claude quota scope and last update instead of Codex saved resets, and the setup screen hides saved-reset reminders.
+
+Protocol references inspected: [Claude Code 2.1.39 package](https://www.npmjs.com/package/@anthropic-ai/claude-code/v/2.1.39) (OAuth constants and manual code exchange) and [CodexBar Claude OAuth usage reader](https://github.com/steipete/CodexBar/blob/main/Sources/CodexBarCore/Providers/Claude/ClaudeOAuth/ClaudeOAuthUsageFetcher.swift). No source code or artwork was copied. This compatibility is not an approved third-party OAuth registration; live authorization and scope acceptance still need account testing.
+
 ## Scheduling
 
 Periodic work targets 15 minutes. Routine HTTP is skipped when locked, idle or without a widget/visible app. Unlock events request a refresh while the process survives; otherwise Android schedules the next opportunity. Explicit requests have a persistent 60-second minimum; automatic attempts have a 5-minute minimum. HTTP 429 respects `Retry-After`, with a 15-minute fallback. Other failures use persistent backoff; rejected clients pause for an hour.
@@ -28,7 +38,7 @@ Square, Slim, Arc and Detail share a background and quota colors. Detail keeps s
 
 Production responsive bitmaps are bounded to 512 pixels per edge. Offline documentation exports use a separate 4× scale; README images are not enlarged low-resolution screenshots. Picker previews contain unknown values, not synthetic quotas.
 
-The downloadable APK is a signed debug build. Preserve its signing key to update existing installations. CI runners generate their own debug key; their APKs may not update over the downloadable build. No private key is committed.
+The downloadable APKs are signed debug builds. Version 1.4.0 is published separately as `codex-usage-claude.apk` because the original 1.3.1 signing key was not available in this environment. Their certificates differ; an in-place update from the old download is not possible. Preserve the current signing key outside Git for future updates. CI runners generate their own debug key; their APKs may not update over the downloadable build. No private key is committed.
 
 ```sh
 ./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest

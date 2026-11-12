@@ -7,11 +7,13 @@ import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import android.widget.EditText
 import androidx.test.core.app.ApplicationProvider
 import androidx.work.WorkManager
 import dev.codex.widget.data.*
 import dev.codex.widget.domain.UsageSnapshot
 import dev.codex.widget.domain.UsageWindow
+import dev.codex.widget.domain.UsageProvider
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
@@ -36,6 +38,8 @@ class ConnectionTestApplication : CodexApplication() {
         AppGraph(this, MemoryStore(), HttpTransport { url, _, _, _ -> when {
             url.endsWith("/usercode") -> { deviceRequests.incrementAndGet(); error("A second login was started") }
             url.endsWith("/deviceauth/token") -> throw HttpFailure(403)
+            url == ClaudeAuth.TOKEN_URL -> """{"access_token":"claude-test","refresh_token":"refresh","expires_in":7200,"scope":"user:profile","account":{"uuid":"claude-account"}}"""
+            url == "https://api.anthropic.com/api/oauth/usage" -> { usageRequests.incrementAndGet(); ClaudeTest.USAGE }
             url.endsWith("/usage") -> {
                 usageRequests.incrementAndGet()
                 val root = JSONObject(UsageTest.INTERNAL)
@@ -63,6 +67,8 @@ class ConnectionUiTest {
         view is ViewGroup -> (0 until view.childCount).flatMap { texts(view.getChildAt(it)) }
         else -> emptyList()
     }
+    private fun descendants(view: View): List<View> = listOf(view) + if (view is ViewGroup)
+        (0 until view.childCount).flatMap { descendants(view.getChildAt(it)) } else emptyList()
     private fun await(activity: SetupActivity, part: String) {
         val until = System.currentTimeMillis() + 8000
         while (System.currentTimeMillis() < until) {
@@ -144,6 +150,34 @@ class ConnectionUiTest {
             capture(controller.get(),"connected-en-synthetic")
             runBlocking { app.graph.repository.signOut() }
             assertEquals("en",Language.code(app))
+        } finally { controller.pause().stop().destroy() }
+    }
+
+    @Test fun `Claude browser return preserves authorization and manual code completes the connection`() {
+        runBlocking { app.graph.login.begin(UsageProvider.CLAUDE) }
+        val pending = app.graph.store.read().getJSONObject(LoginManager.PENDING)
+        val url = ClaudeAuth.authorizationUrl(pending)
+        val controller = Robolectric.buildActivity(SetupActivity::class.java).setup()
+        try {
+            await(controller.get(), "Abrir autorización de Claude")
+            controller.recreate()
+            await(controller.get(), "Abrir autorización de Claude")
+            assertEquals(url, runBlocking { app.graph.login.view().authorizationUrl })
+            val views = descendants(controller.get().window.decorView)
+            views.filterIsInstance<TextView>().first { it.text.toString() == "Abrir autorización de Claude" }.performClick()
+            assertEquals(url, shadowOf(controller.get()).nextStartedActivity.data.toString())
+            val input = views.filterIsInstance<EditText>().single()
+            assertFalse(input.isSaveEnabled)
+            input.setText("returned-code#${pending.getString("id")}")
+            views.filterIsInstance<TextView>().first { it.text.toString() == "Completar conexión" }.performClick()
+            await(controller.get(), "SESIÓN INICIADA")
+            val visible = texts(controller.get().window.decorView)
+            assertTrue(visible.contains("Claude")); assertTrue(visible.contains("Añadir widget"))
+            assertFalse(visible.contains("Copiar código y abrir OpenAI"))
+            assertFalse(visible.contains(controller.get().getString(R.string.expiry_reminders)))
+            assertEquals(UsageProvider.CLAUDE, Session.decode(app.graph.store.read().getJSONObject("session")).provider)
+            assertEquals(0, app.deviceRequests.get())
+            capture(controller.get(), "claude-connected-synthetic")
         } finally { controller.pause().stop().destroy() }
     }
 

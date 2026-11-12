@@ -1,10 +1,10 @@
 <resources>
     <string name="app_name">Codex Usage</string>
-    <string name="widget_description">Compact Codex usage and reset countdowns</string>
-    <string name="widget_square">Codex · Square</string>
-    <string name="widget_slim">Codex · Slim</string>
-    <string name="widget_mini">Codex · Arc</string>
-    <string name="widget_extended">Codex · Detail</string>
+    <string name="widget_description">Codex or Claude plan usage and reset countdowns</string>
+    <string name="widget_square">Codex / Claude · Square</string>
+    <string name="widget_slim">Codex / Claude · Slim</string>
+    <string name="widget_mini">Codex / Claude · Arc</string>
+    <string name="widget_extended">Codex / Claude · Detail</string>
     <string name="codex_title">Codex</string>
     <string name="five_hours">5 hours</string>
     <string name="weekly">Weekly</string>
@@ -26,7 +26,7 @@
     <string name="restoring">Restoring your session</string>
     <string name="moment">One moment…</string>
     <string name="continue_chatgpt">Continue with ChatGPT</string>
-    <string name="providers">Use Google, Apple or email on OpenAI.</string>
+    <string name="providers">One active account at a time. Sign in with your provider in the browser.</string>
     <string name="your_code">AUTHORIZATION CODE</string>
     <string name="copy_open">Copy code and open OpenAI</string>
     <string name="auth_steps">1  Sign in on OpenAI.\n2  Paste this code and authorize.\n3  Return here to finish.</string>
@@ -58,10 +58,10 @@
     <string name="finishing">Finishing the connection…</string>
     <string name="connecting">CONNECTING</string>
     <string name="preparing_access">Preparing sign-in…</string>
-    <string name="requesting_code">Requesting a code from OpenAI.</string>
+    <string name="requesting_code">Preparing authorization.</string>
     <string name="disconnected">NOT CONNECTED</string>
     <string name="connect_account">Connect your account</string>
-    <string name="authorize_detail">Authorize ChatGPT to view your Codex limits.</string>
+    <string name="authorize_detail">Connect ChatGPT or Claude to view your plan limits.</string>
     <string name="check_connection">CHECK CONNECTION</string>
     <string name="try_again">Try again</string>
     <string name="code_expires">Expires in %1$s</string>
@@ -83,7 +83,7 @@
     <string name="allowed">Allowed</string>
     <string name="blocked">Blocked or no permission</string>
     <string name="diagnostic_text">Session: %1$s\nLast read: %2$s\n%3$s\n\n%4$s\n\nNotifications: %5$s</string>
-    <string name="diagnostic_help">Authorization lasts 15 minutes and continues outside this screen. Android may delay background work. Google is selected on OpenAI. Usage uses an unofficial internal interface.</string>
+    <string name="diagnostic_help">Authorization lasts 15 minutes. For Claude, paste the complete browser code here. Android may delay background work. Usage uses unofficial interfaces.</string>
     <string name="usage_ok">Usage updated.</string>
     <string name="usage_partial">Usage updated; reset expiry unavailable.</string>
     <string name="usage_none">Usage has not been read yet.</string>
@@ -91,13 +91,23 @@
     <string name="http_error">Server returned HTTP %1$d. Cached data retained.</string>
     <string name="offline">Offline or server unavailable. Cached data retained.</string>
     <string name="incompatible">Response incompatible or secure storage unavailable.</string>
-    <string name="login_wait">OpenAI asked us to wait. Your authorization is saved.</string>
-    <string name="login_offline">Cannot reach OpenAI. Your authorization is saved for retry.</string>
-    <string name="login_rejected">OpenAI did not complete authorization (HTTP %1$d). Request a new code.</string>
+    <string name="login_wait">The provider asked us to wait. Your authorization is saved.</string>
+    <string name="login_offline">Cannot reach the provider. Your authorization is saved for retry.</string>
+    <string name="login_rejected">The provider did not complete authorization (HTTP %1$d). Request a new code.</string>
     <string name="login_failed">Authorization failed. Request a new code.</string>
     <string name="channel_name">Saved reset expiry</string>
     <string name="channel_description">Daily reminders in the final seven days.</string>
     <string name="notification_title">Saved Codex reset expires soon</string>
     <string name="notification_text">1 saved reset available. Expires %1$s.</string>
     <plurals name="more_expiries"><item quantity="one">+%1$d more expiry date</item><item quantity="other">+%1$d more expiry dates</item></plurals>
+    <string name="continue_claude">Continue with Claude</string>
+    <string name="open_claude">Open Claude authorization</string>
+    <string name="connect_claude">Finish connection</string>
+    <string name="claude_code_hint">Paste the complete code from Claude</string>
+    <string name="claude_invalid_code">Copy the complete code from the authorization opened here, including # and the text after it.</string>
+    <string name="claude_auth_steps">1  Open Claude and authorize.\n2  Copy the complete code shown in the browser.\n3  Return here, paste it and finish the connection.</string>
+    <string name="claude_consent">Authorize this independent app on Claude to read your subscription limits. Your session is encrypted on this phone. Compatibility uses the Claude Code sign-in interface, which may change or reject independent clients.</string>
+    <string name="browser_unavailable">Install a browser to continue authorization.</string>
+    <string name="claude_plan_limits">Claude plan limits</string>
+    <string name="claude_all_models">Weekly quota · All models</string>
 </resources>

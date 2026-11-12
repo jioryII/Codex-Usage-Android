@@ -30,6 +30,7 @@ jobs:
             app/build/outputs/apk/
             app/build/outputs/widget-fixtures/
             app/build/outputs/documentation/
+            app/build/outputs/claude-fixtures/
             app/build/outputs/connection-fixtures/
             app/build/outputs/widget-previews/
             app/build/outputs/icon-fixtures/

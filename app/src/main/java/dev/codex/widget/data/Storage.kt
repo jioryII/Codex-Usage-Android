@@ -7,6 +7,7 @@ import android.util.AtomicFile
 import dev.codex.widget.domain.ResetCredit
 import dev.codex.widget.domain.UsageSnapshot
 import dev.codex.widget.domain.UsageWindow
+import dev.codex.widget.domain.UsageProvider
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -66,7 +67,7 @@ object SnapshotCodec {
             rows.forEach { put(JSONObject().put("id", it.id).put("status", it.status)
                 .put("expires", it.expiresAt ?: JSONObject.NULL)) }
         } } ?: JSONObject.NULL)
-        .put("fetched", s.fetchedAt).put("source", s.source)
+        .put("fetched", s.fetchedAt).put("source", s.source).put("provider", s.provider.name)
     fun decode(root: JSONObject?): UsageSnapshot? = root?.let { s ->
         fun w(key: String) = s.optJSONObject(key)?.let {
             UsageWindow(it.getInt("remaining"), if (it.isNull("reset")) null else it.getLong("reset"))
@@ -77,6 +78,7 @@ object SnapshotCodec {
                 if (row.isNull("expires")) null else row.getLong("expires"))
         } }
         UsageSnapshot(w("five"), w("weekly"), if (s.isNull("count")) null else s.getInt("count"),
-            credits, s.getLong("fetched"), s.getString("source"))
+            credits, s.getLong("fetched"), s.getString("source"),
+            UsageProvider.valueOf(s.optString("provider", "CODEX")))
     }
 }

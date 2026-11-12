@@ -6,11 +6,13 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import dev.codex.widget.domain.UsageProvider
 import java.io.IOException
 
 enum class LoginPhase { SIGNED_OUT, REQUESTING, WAITING, EXCHANGING, SIGNED_IN, ERROR }
 data class LoginView(val phase: LoginPhase, val code: String? = null, val expiresAt: Long? = null,
-    val email: String? = null, val message: String? = null)
+    val email: String? = null, val message: String? = null,
+    val provider: UsageProvider = UsageProvider.CODEX, val authorizationUrl: String? = null)
 sealed class LoginStep {
     data object Done : LoginStep()
     data object Retry : LoginStep()
@@ -21,6 +23,7 @@ sealed class LoginStep {
 class LoginManager(
     private val repository: UsageRepository,
     private val auth: DeviceAuth,
+    private val claude: ClaudeAuth? = null,
     private val now: () -> Long = { System.currentTimeMillis() / 1000 },
 ) {
     private val operation = Mutex()
@@ -28,12 +31,14 @@ class LoginManager(
     suspend fun view(): LoginView {
         val state = repository.readState()
         state.optJSONObject("session")?.let {
-            return LoginView(LoginPhase.SIGNED_IN, email = Session.decode(it).email)
+            val session = Session.decode(it)
+            return LoginView(LoginPhase.SIGNED_IN, email = session.email, provider = session.provider)
         }
         val pending = state.optJSONObject(PENDING)
         if (pending != null && pending.getLong("expiresAt") > now() && !pending.optBoolean("failed")) {
             return LoginView(if (pending.has("grant")) LoginPhase.EXCHANGING else LoginPhase.WAITING,
-                pending.getString("code"), pending.getLong("expiresAt"), message = state.optional("loginMessage"))
+                pending.getString("code"), pending.getLong("expiresAt"), message = state.optional("loginMessage"),
+                provider = provider(pending), authorizationUrl = if (provider(pending) == UsageProvider.CLAUDE) ClaudeAuth.authorizationUrl(pending) else null)
         }
         if (state.optBoolean("loginRequesting")) return LoginView(LoginPhase.REQUESTING)
         val error = state.optional("loginError") ?: pending?.let { "login_expired" }
@@ -50,7 +55,7 @@ class LoginManager(
     }
 
     /** Existing sessions and unexpired codes are reused; never starts a second authorization. */
-    suspend fun begin() = operation.withLock {
+    suspend fun begin(provider: UsageProvider = UsageProvider.CODEX) = operation.withLock {
         val state = repository.readState()
         if (state.has("session")) return@withLock
         val pending = state.optJSONObject(PENDING)
@@ -58,6 +63,11 @@ class LoginManager(
         repository.transaction { it.put("loginRequesting", true); it.remove("loginError"); it.remove("loginMessage"); it.remove(PENDING) }
         try {
             withContext(NonCancellable) {
+                if (provider == UsageProvider.CLAUDE) {
+                    val authorization = requireNotNull(claude).begin()
+                    repository.transaction { it.put(PENDING, authorization); it.remove("loginRequesting") }
+                    return@withContext
+                }
                 val device = auth.begin()
                 repository.transaction {
                     if (!it.has("session")) it.put(PENDING, JSONObject().put("id", device.id).put("code", device.code)
@@ -76,6 +86,18 @@ class LoginManager(
     }
     suspend fun signOut() = operation.withLock { repository.signOut() }
 
+    suspend fun submitClaudeCode(value: String) = operation.withLock {
+        val state = repository.readState()
+        require(!state.has("session"))
+        val pending = state.getJSONObject(PENDING)
+        require(provider(pending) == UsageProvider.CLAUDE && pending.getLong("expiresAt") > now() && !pending.optBoolean("failed"))
+        val code = ClaudeAuth.validateCode(value, pending)
+        repository.transaction {
+            it.getJSONObject(PENDING).put("grant", JSONObject().put("code", code))
+            it.remove("loginMessage")
+        }
+    }
+
     suspend fun step(): LoginStep = operation.withLock {
         val state = repository.readState()
         if (state.has("session")) return@withLock LoginStep.Done
@@ -85,24 +107,29 @@ class LoginManager(
             repository.transaction { it.remove(PENDING); it.put("loginError", "login_expired") }
             return@withLock LoginStep.Done
         }
+        val isClaude = provider(pending) == UsageProvider.CLAUDE
+        // Claude returns a code in the browser; there is no device polling endpoint.
+        if (isClaude && !pending.has("grant")) return@withLock LoginStep.Done
         val next = pending.optLong("nextPollAt")
-        if (!pending.has("grant") && next > now()) return@withLock LoginStep.Wait(next - now())
+        if ((isClaude || !pending.has("grant")) && next > now()) return@withLock LoginStep.Wait(next - now())
         try {
             // Save a one-time grant before exchanging it. Cancellation cannot discard a received response.
             withContext(NonCancellable) {
-                var grant = pending.optJSONObject("grant")?.let(AuthorizationGrant::decode)
-                if (grant == null) {
+                var grant = if (isClaude) null else pending.optJSONObject("grant")?.let(AuthorizationGrant::decode)
+                if (!isClaude && grant == null) {
                     repository.transaction { it.getJSONObject(PENDING).put("nextPollAt", now() + pending.getLong("interval")) }
                     grant = auth.poll(DeviceCode(pending.getString("id"), pending.getString("code"), pending.getLong("interval")))
                     if (grant != null) repository.transaction { it.getJSONObject(PENDING).put("grant", grant.encode()); it.remove("loginMessage") }
                 }
-                if (grant == null) return@withContext LoginStep.Wait(pending.getLong("interval"))
-                val session = auth.exchange(grant)
+                if (!isClaude && grant == null) return@withContext LoginStep.Wait(pending.getLong("interval"))
+                val session = if (isClaude) requireNotNull(claude).exchange(pending) else auth.exchange(requireNotNull(grant))
                 repository.transaction {
                     // A cancelled/replaced flow must never resurrect or replace an existing session.
                     if (!it.has("session") && it.optJSONObject(PENDING)?.optString("id") == pending.getString("id")) {
                         it.put("session", session.encode()); it.remove("snapshot"); it.remove("ledger")
                         it.remove("lastSuccess"); it.remove("lastAttempt"); it.remove("retryAt"); it.remove("diagnostic")
+                        it.remove("failures"); it.remove("lastFailed")
+                        if (isClaude) it.put("reminders", false)
                     }
                     it.remove(PENDING); it.remove("loginError"); it.remove("loginMessage"); it.remove("loginRequesting")
                 }
@@ -131,5 +158,6 @@ class LoginManager(
         else -> "login_failed"
     }
     private fun JSONObject.optional(key: String) = optString(key).takeUnless { it.isBlank() || it == "null" }
+    private fun provider(pending: JSONObject) = UsageProvider.valueOf(pending.optString("provider", "CODEX"))
     companion object { const val PENDING = "pendingLogin" }
 }
